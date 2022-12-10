@@ -4,6 +4,7 @@ mod day3;
 mod day4;
 mod day5;
 mod day6;
+mod day7;
 use clap::{ Arg, App };
 
 fn main() {
@@ -51,7 +52,12 @@ fn main() {
                 1 => day6::part1(file_path).to_string(),
                 2 => day6::part2(file_path).to_string(),
                 _ => panic!("Unknown part {}", part)
-            }
+            },
+            7 => match part {
+                1 => day7::part1(file_path).to_string(),
+                2 => day7::part2(file_path).to_string(),
+                _ => panic!("Unknown part {}", part)
+            },
             _ => panic!("Unknown day {}", day)
         };
 
