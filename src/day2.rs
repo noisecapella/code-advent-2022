@@ -1,5 +1,4 @@
-use std::{env, fs};
-use std::detect::__is_feature_detected::sha;
+use std::fs;
 
 fn calc_score(tups: Vec<Vec<&str>>) -> u64 {
     let mut score = 0;
@@ -38,9 +37,7 @@ fn calc_score(tups: Vec<Vec<&str>>) -> u64 {
     score
 }
 
-pub fn day2_part1() -> u64 {
-    let args: Vec<String> = env::args().collect();
-    let file_path = &args[1];
+pub fn part1(file_path: &str) -> u64 {
     let contents = fs::read_to_string(file_path).unwrap();
 
     let tups: Vec<Vec<&str>> = contents
@@ -53,9 +50,7 @@ pub fn day2_part1() -> u64 {
     calc_score(tups)
 }
 
-pub fn day2_part2() -> u64 {
-    let args: Vec<String> = env::args().collect();
-    let file_path = &args[1];
+pub fn part2(file_path: &str) -> u64 {
     let contents = fs::read_to_string(file_path).unwrap();
 
     let tups: Vec<Vec<&str>> = contents

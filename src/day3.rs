@@ -1,4 +1,4 @@
-use std::{env, fs};
+use std::fs;
 use std::collections::HashSet;
 use itertools::Itertools;
 
@@ -10,9 +10,7 @@ fn char_to_value(char: char) -> u32 {
     }
 }
 
-pub fn day3_part1() -> u32 {
-    let args: Vec<String> = env::args().collect();
-    let file_path = &args[1];
+pub fn part1(file_path: &str) -> u32 {
     let contents = fs::read_to_string(file_path).unwrap();
 
     let lines = contents.split("\n").map(|line| line.trim()).filter(|line| !line.is_empty());
@@ -34,9 +32,7 @@ pub fn day3_part1() -> u32 {
     }).map(char_to_value).sum();
 }
 
-pub fn day3_part2() -> u32 {
-    let args: Vec<String> = env::args().collect();
-    let file_path = &args[1];
+pub fn part2(file_path: &str) -> u32 {
     let contents = fs::read_to_string(file_path).unwrap();
 
     let lines = contents.split("\n").map(|line| line.trim()).filter(|line| !line.is_empty());

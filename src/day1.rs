@@ -1,8 +1,6 @@
-use std::{env, fs, io};
+use std::fs;
 
-fn parse_calories() -> Vec<Vec<u64>> {
-    let args: Vec<String> = env::args().collect();
-    let file_path = &args[1];
+fn parse_calories(file_path: &str) -> Vec<Vec<u64>> {
     let contents = fs::read_to_string(file_path).unwrap();
 
     let lines = contents.split("\n").map(|line| line.trim());
@@ -23,8 +21,8 @@ fn parse_calories() -> Vec<Vec<u64>> {
 }
 
 
-pub fn day1_part1() -> u64 {
-    let elfs = parse_calories();
+pub fn part1(file_path: &str) -> u64 {
+    let elfs = parse_calories(file_path);
 
     let sums: Vec<u64> = elfs.iter().map(|group| group.iter().sum()).collect();
     let max = *sums.iter().max().unwrap();
@@ -33,8 +31,8 @@ pub fn day1_part1() -> u64 {
 }
 
 
-pub fn day1_part2() -> u64 {
-    let elfs = parse_calories();
+pub fn part2(file_path: &str) -> u64 {
+    let elfs = parse_calories(file_path);
 
     let mut sums: Vec<u64> = elfs.iter().map(|group| group.iter().sum()).collect();
     sums.sort();
