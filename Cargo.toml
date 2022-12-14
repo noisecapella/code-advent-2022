@@ -9,3 +9,5 @@ clap = '*'
 array2d = '*'
 regex = '*'
 lazy_static = '*'
+serde = '*'
+serde_json = "*"
