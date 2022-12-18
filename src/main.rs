@@ -13,6 +13,7 @@ mod day12;
 mod day13;
 mod day14;
 mod day15;
+mod day16;
 mod common;
 
 use clap::{ Arg, App };
@@ -23,8 +24,6 @@ fn main() {
         .arg(Arg::with_name("part").takes_value(true).required(true).value_parser(clap::value_parser!(u16).range(1..=2)))
         .arg(Arg::with_name("input").takes_value(true).required(true))
         .get_matches();
-
-
 
     let file_path: &String = matches.get_one("input").unwrap();
     let day: u16 = *matches.get_one("day").unwrap();
@@ -107,6 +106,11 @@ fn main() {
                 1 => day15::part1(file_path).to_string(),
                 2 => day15::part2(file_path).to_string(),
                 _ => panic!("Unknown part {}", part)
+            },
+            16 => match part {
+                1 => day16::part1(file_path).to_string(),
+                2 => day16::part2(file_path).to_string(),
+                _ => panic!("Unknown {}", part)
             }
             _ => panic!("Unknown day {}", day)
         };
