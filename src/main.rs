@@ -16,6 +16,7 @@ mod day15;
 mod day16;
 mod day17;
 mod day18;
+mod day19;
 mod common;
 
 use clap::{ Arg, App };
@@ -122,6 +123,11 @@ fn main() {
             18 => match part {
                 1 => day18::part1(file_path).to_string(),
                 2 => day18::part2(file_path).to_string(),
+                _ => panic!("Unknown {}", part)
+            },
+            19 => match part {
+                1 => day19::part1(file_path).to_string(),
+                2 => day19::part2(file_path).to_string(),
                 _ => panic!("Unknown {}", part)
             }
             _ => panic!("Unknown day {}", day)
