@@ -172,70 +172,6 @@ pub fn dijkstra(valves_map: &HashMap<CoordType, Valve>, source: CoordType) -> Ha
 }
 
 
-/*pub fn backtrack(valves_with_flow: &Vec<Valve>) -> (u64, i64) {
-    if minutes >= 20 {
-        return (minutes, cum_flow);
-    }
-
-    if total_valves == valves_open.len() {
-        return backtrack(
-            &valves_map,
-            &valves_open,
-            total_valves,
-            current,
-            minutes + 1,
-            flow,
-            cum_flow + flow,
-        );
-    }
-
-    let mut ret: Option<(u64, i64)> = None;
-    let current_valve = &valves_map[&current];
-    let current_flow_rate = current_valve.flow_rate;
-
-    if !valves_open.contains(&current) && current_flow_rate > 0 {
-        let mut new_valves_open: Vec<CoordType> = valves_open.iter().map(|coord| *coord).collect();
-        new_valves_open.push(current);
-
-        let item = backtrack(
-            &valves_map,
-            &new_valves_open,
-            total_valves,
-            current,
-            minutes + 1,
-            flow + current_flow_rate,
-            cum_flow + flow + current_flow_rate,
-        );
-
-        ret = Some(item);
-    }
-
-    for neighbor in current_valve.next_valves.iter() {
-        let item = backtrack(
-            &valves_map,
-            &valves_open,
-            total_valves,
-            *neighbor,
-            minutes + 1,
-            flow,
-            cum_flow + flow
-        );
-
-        match &ret {
-            None => {
-                ret = Some(item);
-            },
-            Some(_ret) => {
-                if _ret.1 < item.1 {
-                    ret = Some(item);
-                }
-            }
-        }
-    }
-
-    ret.unwrap()
-}*/
-
 fn make_path(valves_with_flow: &Vec<CoordType>, paths: &HashMap<CoordType, HashMap<CoordType, CoordType>>, start: CoordType) -> Vec<CoordType> {
     let mut path= Vec::new();
     let mut prev = start;
@@ -284,14 +220,111 @@ fn calc_flow(path: &Vec<CoordType>, valves_map: &HashMap<CoordType, Valve>) -> i
     cum_flow
 }
 
+/*fn backtrack(valves_map: &HashMap<CoordType, Valve>, valves_left: &Vec<&Valve>, path_distances: &HashMap<(CoordType, CoordType), u64>, current_flow: i64, minutes: u64) -> i64 {
+
+    let max_possible_flow = valves_left.iter().filter_map(|next_valve| {
+        let valves_left_next = valves_left.iter().filter_map(|_valve| {
+            if _valve.name != next_valve.name {
+                Some(*_valve)
+            } else {
+                None
+            }
+        }).collect();
+
+        if minutes + 1 >= 30 {
+            return None
+        }
+
+        let result = backtrack(&valves_map, &valves_left_next, &path_distances, current_flow + next_valve.flow_rate, minutes + 1);
+
+        Some(result)
+    }).max().unwrap();
+
+    max_possible_flow
+}*/
+
+fn find_best_path(valves_with_flow: &Vec<Valve>, distances: &HashMap<(CoordType, CoordType), i64>, start: CoordType) -> (Vec<CoordType>, i64) {
+    let mut ret_coords = Vec::new();
+    let mut ret_flow = 0;
+    let mut minutes = 0;
+
+    let mut prev = start;
+    while ret_coords.len() != valves_with_flow.len() {
+        let result = valves_with_flow.iter().filter_map(|valve| {
+            if ret_coords.contains(&valve.name) {
+                return None;
+            }
+
+            let distance = distances.get(&(prev, valve.name)).unwrap();
+            println!("distance {:?} {:?} = {}", prev, valve.name, distance);
+            if distance + minutes > 30 {
+                None
+            } else {
+                println!("{:?} to {:?} with flow rate = {}, distance = {}, {} minutes left, has total lifetime flow {}", prev, valve.name, valve.flow_rate, distance, 30 - minutes, (30 - minutes - distance) * valve.flow_rate);
+                Some(((30 - minutes - distance) * valve.flow_rate, distance, valve.name))
+            }
+        }).max_by_key(|tup| tup.0);
+
+        match result {
+            None => {
+                panic!("what?")
+            },
+            Some((best_flow, best_distance, best_coord)) => {
+                ret_coords.push(best_coord);
+                ret_flow += best_flow;
+                minutes += best_distance - 1;
+                prev = best_coord;
+            }
+        }
+    }
+
+    (ret_coords, ret_flow)
+}
+
+fn update_is_valve(coord: CoordType, is_valve: bool) -> CoordType {
+    CoordType {
+        letter1: coord.letter1,
+        letter2: coord.letter2,
+        is_valve
+    }
+}
+
+fn calc_distances(paths: &HashMap<CoordType, HashMap<CoordType, CoordType>>) -> HashMap<(CoordType, CoordType), i64> {
+    let mut distances: HashMap<(CoordType, CoordType), i64> = HashMap::new();
+
+    for prev_valve in paths.keys() {
+        for next_valve in paths.keys() {
+            if next_valve == prev_valve {
+                continue;
+            }
+            let path = reconstruct_path(&paths[&prev_valve], *next_valve);
+            distances.insert((*prev_valve, *next_valve), path.len() as i64);
+        }
+    }
+
+    distances
+}
+
 pub fn part1(file_path: &str) -> i64 {
     let valves = read_valves(file_path);
-    let num_valves = valves.iter().filter(|valve| valve.flow_rate > 0).count();
+    // let num_valves = valves.iter().filter(|valve| valve.flow_rate > 0).count();
     let valves_map: HashMap<CoordType, Valve> = valves.into_iter().map(|valve| (valve.name, valve)).collect();
 
     let start = to_valve_key("AA");
     //let result = dijkstra(&valves_map, start);
     let mut paths: HashMap<CoordType, HashMap<CoordType, CoordType>> = HashMap::new();
+
+    let valves_with_flow: Vec<Valve> = valves_map.values().filter_map(|valve| {
+        if valve.flow_rate > 0 {
+            Some(Valve {
+                name: update_is_valve(valve.name, true),
+                flow_rate: valve.flow_rate,
+                next_valves: valve.next_valves.clone(),
+            })
+        } else {
+            None
+        }
+    }).collect();
 
     for valve_key in valves_map.keys() {
         paths.insert(*valve_key, dijkstra(&valves_map, *valve_key));
@@ -303,74 +336,27 @@ pub fn part1(file_path: &str) -> i64 {
         paths.insert(coord_type, dijkstra(&valves_map, coord_type));
     }
 
-    let valves_with_flow: Vec<CoordType> = valves_map.values().filter(|valve| {
-        valve.flow_rate > 0
-    }).map(|valve| {
-        CoordType {
-            letter1: valve.name.letter1,
-            letter2: valve.name.letter2,
-            is_valve: true
-        }
-    }).collect();
-
+    /*
     let (best_path, best_path_flow) = valves_with_flow.iter().permutations(valves_with_flow.len()).map(|permutation| {
         let keys: Vec<CoordType> = permutation.iter().map(|x| **x).collect();
         let path = make_path(&keys, &paths, start);
         (path.clone(), calc_flow(&path, &valves_map))
-    }).max_by_key(|tup| tup.1).unwrap();
-
+    }).max_by_key(|tup| tup.1).unwrap();*/
     /*
-    let other_path = [
-        "DD", "DD+", "CC", "BB", "BB+", "AA", "II", "JJ", "JJ+", "II", "AA", "DD",
-        "EE", "FF", "GG", "HH", "HH+", "GG", "FF", "EE", "EE+", "DD", "CC", "CC+"
-    ].into_iter().map(to_valve_key).collect();
-*/
+    let best_path_flow = backtrack(
+        &valves_map,
+        &valves_with_flow,
+        &paths,
+        0,
+        30
+    );*/
 
-    let other_path = make_path(&["DD+", "BB+", "JJ+", "HH+", "EE+", "CC+"].iter().map(|key| {
-        to_valve_key(*key)
-    }).collect(),&paths, start);
-    println!("other path {:?} {}", &other_path, calc_flow(&other_path, &valves_map));
+    let distances = calc_distances(&paths);
 
-    let other_path: Vec<CoordType> = [
-        "DD", "DD+", "CC", "BB", "BB+", "AA", "II", "JJ", "JJ+", "II", "AA", "DD",
-        "EE", "FF", "GG", "HH", "HH+", "GG", "FF", "EE", "EE+", "DD", "CC", "CC+"
-    ].into_iter().map(to_valve_key).collect();
-    println!("other path {:?} {}", &other_path, calc_flow(&other_path, &valves_map));
+    let (best_coords, best_flow) = find_best_path(&valves_with_flow, &distances, start);
 
-    /*
-    println!("{:?}", path);
-
-    let mut cum_flow = 0;
-    let mut flow = 0;
-    for minute in 0..30 {
-        cum_flow += flow;
-
-        match path.get(minute) {
-            None => {
-                println!("Minute {}: nothing to do", minute);
-            },
-            Some(item) => {
-                if item.is_valve {
-                    let valve = &valves_map[&CoordType {
-                        letter1: item.letter1,
-                        letter2: item.letter2,
-                        is_valve: false,
-                    }];
-
-                    flow += valve.flow_rate;
-                    println!("Minute {}: opened valve {:?} to release {}", minute, item, valve.flow_rate);
-                } else {
-                    println!("Minute {}: moved to item {:?}", minute, item);
-                }
-            }
-        }
-
-        println!("cumulative flow is {}, flow is {}", cum_flow, flow);
-    }
-
-     */
-    println!("best path {:?} {}", best_path, best_path_flow);
-    best_path_flow
+    //println!("best path {:?} {}", best_path, best_path_flow);
+    best_flow
 }
 
 pub fn part2(file_path: &str) -> i64 {
