@@ -147,7 +147,7 @@ enum SideDirection {
     Front,
     Back,
 }
-
+/*
 
 fn rotate(side_direction: SideDirection, direction: Direction) -> (SideDirection, Rotation) {
     match side_direction {
@@ -305,7 +305,7 @@ fn make_cube(board: &Board) -> Cube {
         back: (directions_reverse[&SideDirection::Back], SideDirection::Back),
     }
 }
-
+*/
 fn calc_next_col(board: &Board, current: Position, diff: i64, as_cube: bool) -> Position {
     let mut new_coord = Coord {
         col: current.coord.col as i64 + diff,
