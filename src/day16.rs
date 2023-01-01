@@ -356,7 +356,7 @@ fn find_best_path_elephant(valves_with_flow: &Vec<Valve>, distances: &HashMap<(C
         me_current: CoordType,
         elephant_minutes: i64,
         elephant_current: CoordType,
-        flow_rate: i64
+        flow: i64
     }
 
     const TOTAL_MINUTES: i64 = 26;
@@ -366,9 +366,9 @@ fn find_best_path_elephant(valves_with_flow: &Vec<Valve>, distances: &HashMap<(C
         me_current: start,
         elephant_minutes: 0,
         elephant_current: start,
-        flow_rate: 0
+        flow: 0
     }];
-    let mut max_flow_rate = 0;
+    let mut max_flow = 0;
 
     println!("distances {} {:?}", distances.len(), distances);
     println!("valves {} {:?}", valves_with_flow.len(), valves_with_flow);
@@ -376,16 +376,10 @@ fn find_best_path_elephant(valves_with_flow: &Vec<Valve>, distances: &HashMap<(C
 
     loop {
         if old_moves.is_empty() {
-            return max_flow_rate;
+            return max_flow;
         }
         println!("old_moves {}", old_moves.len());
-        let new_moves: Vec<State> = old_moves.iter().filter_map(|old_state| {
-            if old_state.me_minutes >= TOTAL_MINUTES && old_state.elephant_minutes >= TOTAL_MINUTES {
-                return None
-            }
-            if old_state.flow_rate > max_flow_rate {
-                max_flow_rate = old_state.flow_rate;
-            }
+        let new_moves = old_moves.iter().filter_map(|old_state| {
 
             Some(valves_with_flow.iter().filter_map(|valve| {
                 if old_state.me_minutes >= TOTAL_MINUTES {
@@ -400,16 +394,17 @@ fn find_best_path_elephant(valves_with_flow: &Vec<Valve>, distances: &HashMap<(C
                 if new_flow == 0 {
                     return None
                 }
-                let flow = new_flow + old_state.flow_rate;
+                let flow = new_flow + old_state.flow;
                 let mut new_move_path = old_state.path.clone();
                 new_move_path.push(valve.name);
+
                 Some(State {
                     path: new_move_path,
                     me_minutes: minutes,
                     me_current: valve.name,
                     elephant_minutes: old_state.elephant_minutes,
                     elephant_current: old_state.elephant_current,
-                    flow_rate: flow
+                    flow: flow
                 })
             }).chain(valves_with_flow.iter().filter_map(|valve| {
                 if old_state.elephant_minutes >= TOTAL_MINUTES {
@@ -424,7 +419,7 @@ fn find_best_path_elephant(valves_with_flow: &Vec<Valve>, distances: &HashMap<(C
                 if new_flow == 0 {
                     return None
                 }
-                let flow = new_flow + old_state.flow_rate;
+                let flow = new_flow + old_state.flow;
                 let mut new_move_path = old_state.path.clone();
                 new_move_path.push(valve.name);
                 Some(State {
@@ -433,22 +428,56 @@ fn find_best_path_elephant(valves_with_flow: &Vec<Valve>, distances: &HashMap<(C
                     me_current: old_state.me_current,
                     elephant_minutes: minutes,
                     elephant_current: valve.name,
-                    flow_rate: flow
+                    flow: flow
                 })
 
             })))
-        }).flatten().collect();
+        }).flatten();
 
+        /*
         for new_move in new_moves.iter() {
             if new_move.me_minutes >= TOTAL_MINUTES && new_move.elephant_minutes >= TOTAL_MINUTES {
-                if new_move.flow_rate > max_flow_rate {
-                    max_flow_rate = new_move.flow_rate;
+                if new_move.flow > max_flow {
+                    //max_flow = new_move.flow;
                 }
             }
-        }
+        }*/
 
-        old_moves = new_moves.into_iter().filter(|new_move|
-            !(new_move.me_minutes >= TOTAL_MINUTES && new_move.elephant_minutes >= TOTAL_MINUTES)
+        old_moves = new_moves.into_iter().filter(|new_move| {
+            if new_move.flow > max_flow {
+                max_flow = new_move.flow;
+            }
+            if (new_move.me_minutes >= TOTAL_MINUTES && new_move.elephant_minutes >= TOTAL_MINUTES) {
+                return false;
+            }
+
+
+            let max_remaining_flow_rate = {
+                valves_with_flow.iter().filter_map(|other_valve| {
+                    if new_move.path.contains(&other_valve.name) {
+                        None
+                    } else {
+                        Some(
+                            max(max(
+                                (TOTAL_MINUTES - new_move.me_minutes - distances[&(new_move.me_current, other_valve.name)]) * other_valve.flow_rate,
+                                (TOTAL_MINUTES - new_move.elephant_minutes - distances[&(new_move.elephant_current, other_valve.name)]) * other_valve.flow_rate,
+                            ), 0)
+                        )
+                    }
+                }).max()
+            };
+
+            match max_remaining_flow_rate {
+                Some(_max_remaining_flow) => {
+                    if max_flow > (_max_remaining_flow + new_move.flow) {
+                        return false;
+                    }
+                }
+                _ => {}
+            }
+
+            return true;
+        }
         ).collect();
     }
 }
