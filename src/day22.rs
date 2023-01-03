@@ -1,7 +1,9 @@
 use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::ops::Rem;
 use array2d::Array2D;
+use nalgebra::UnitQuaternion;
 
 struct Board {
     board: Array2D<char>
@@ -101,6 +103,12 @@ struct Coord {
     col: i64
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+struct Increment {
+    row: i64,
+    col: i64
+}
+
 #[derive(Debug, Copy, Clone)]
 struct Position {
     coord: Coord,
@@ -121,21 +129,9 @@ impl Board {
     }
 }
 
-enum Rotation {
-    None,
-    Quarter,
-    Half,
-    ThreeQuarters,
-}
-
-
 struct Cube {
-    top: (Coord, SideDirection, HashMap<SideDirection, Rotation>),
-    bottom: (Coord, SideDirection, HashMap<SideDirection, Rotation>),
-    left: (Coord, SideDirection, HashMap<SideDirection, Rotation>),
-    right: (Coord, SideDirection, HashMap<SideDirection, Rotation>),
-    front: (Coord, SideDirection, HashMap<SideDirection, Rotation>),
-    back: (Coord, SideDirection, HashMap<SideDirection, Rotation>),
+    sides: HashMap<SideDirection, Side>,
+    len_of_side: i64
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -147,176 +143,141 @@ enum SideDirection {
     Front,
     Back,
 }
+
+type Quat = UnitQuaternion<f64>;
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct Side {
+    coord: Coord,
+    direction: SideDirection,
+    quaternion: Quat,
+}
+
+fn _calc_cube(board: &Board, sides: &mut HashMap<SideDirection, Side>, current_side: Side) {
+    sides.insert(current_side.direction, current_side);
+
+    panic!("??");
+
+}
 /*
+fn calc_cube(board: &Board) -> Cube {
+    let len_of_side = (max(board.num_columns(), board.num_rows()) / 4) as i64;
 
-fn rotate(side_direction: SideDirection, direction: Direction) -> (SideDirection, Rotation) {
-    match side_direction {
-        SideDirection::Left => {
-            match direction {
-                Direction::Left => SideDirection::Top
-            }
+    let start = calc_start_position(board);
+    let mut sides = HashMap::new();
+    _calc_cube(board, &mut sides, Side {
+        coord: start.coord,
+        direction: SideDirection::Top,
+        quaternion: UnitQuaternion::from_euler_angles(0f64, 0f64, 0f64),
+    });
+
+    Cube { sides, len_of_side }
+}
+
+fn lookup_side(cube: &Cube, coord: Coord) -> Option<Side> {
+    cube.sides.values().find_map(|side| {
+        if coord.row >= coord.row && coord.row < coord.row + cube.len_of_side && coord.col >= coord.col && coord.col < coord.col + cube.len_of_side {
+            Some(*side)
+        } else {
+            None
         }
+    })
+}
+
+fn transform(coord: Increment, transformation: &Quat, len_of_side: i64) -> Increment {
+    let mut adjusted_new_coord = rotate(
+        len_of_side,
+        Increment {
+            row: coord.row.rem_euclid(len_of_side),
+            col: coord.col.rem_euclid(len_of_side),
+        },
+        transformation.rotation_count
+    );
+
+    Increment {
+        row: if transformation.flip_row { len_of_side - 1 - adjusted_new_coord.row } else { adjusted_new_coord.row },
+        col: if transformation.flip_col { len_of_side - 1 - adjusted_new_coord.col } else { adjusted_new_coord.col },
     }
 }
 
-fn rotate_direction(board: &Board, rotation: Rotation, position: Position) -> Position {
-    // input position at edge, output position and direction at next step along cube
-    let cube_side = max(board.num_columns(), board.num_rows()) / 4;
-
-    let inner_row = position.coord.row % cube_side as i64;
-    let start_row = position.coord.row - inner_row;
-    let inner_col = position.coord.col % cube_side as i64;
-    let start_col = position.coord.col - inner_col;
-
-    match side_direction {
-        SideDirection::Top => {
-            match position.direction {
-                Direction::Left => Position {
-                    coord: Coord {
-                        row: start_row,
-                        col: start_col,
-                    },
-                    direction:
-                }
-            }
-        }
+fn transform_direction(direction: Direction, transformation: &Transformation) -> Direction {
+    let mut result = direction;
+    for _ in 0..transformation.rotation_count {
+        result = match result {
+            Direction::Up => Direction::Right,
+            Direction::Right => Direction::Down,
+            Direction::Down => Direction::Left,
+            Direction::Left => Direction::Up,
+        };
     }
+
+    if transformation.flip_row {
+        result = match result {
+            Direction::Up => Direction::Down,
+            Direction::Right => Direction::Right,
+            Direction::Down => Direction::Up,
+            Direction::Left => Direction::Left
+        }
+    };
+
+    if transformation.flip_col {
+        result = match result {
+            Direction::Up => Direction::Up,
+            Direction::Right => Direction::Left,
+            Direction::Down => Direction::Down,
+            Direction::Left => Direction::Right,
+        }
+    };
+
+    result
 }
 
-fn make_cube(board: &Board) -> Cube {
-    let cube_side = max(board.num_columns(), board.num_rows()) / 4;
+fn get_side(cube: &Cube, board: &Board, current: Position, increment: Increment) -> Position {
+    let len_of_side = (max(board.num_columns(), board.num_rows()) / 4) as i64;
 
-    let mut coords: HashSet<Coord> = HashSet::new();
-    for row in (0..board.num_rows()).step_by(cube_side) {
-        for col in (0..board.num_columns()).step_by(cube_side) {
-            let coord = Coord { row: row as i64, col: col as i64 };
-            match board.get(coord) {
-                None => {},
-                Some(_) => {
-                    coords.insert(coord);
-                }
-            }
-        }
-    }
-
-    let top = calc_start_position(board);
-    let mut directions: HashMap<Coord, SideDirection> = HashMap::new();;
-    directions.insert(top.coord, SideDirection::Top);
-
-    while coords.len() != directions.len() {
-        for coord in coords.iter() {
-            match directions.get(coord) {
-                Some(dir) => {
-                    {
-                        let up_coord = Coord {
-                            row: coord.row - cube_side as i64,
-                            col: coord.col
-                        };
-                        match board.get(up_coord) {
-                            None => {},
-                            Some(_) => {
-                                let new_direction = rotate(*dir, Direction::Left);
-                                if !directions.contains_key(&up_coord) {
-                                    directions.insert(up_coord, new_direction);
-                                } else {
-                                    if directions[&up_coord] != new_direction {
-                                        panic!("unexpected")
-                                    }
-                                }
-                            }
-                        }
+    let original_side = lookup_side(cube, current.coord).unwrap();
+    let new_coord = Coord { row: current.coord.row + increment.row, col: current.coord.col + increment.col };
+    match lookup_side(cube, new_coord) {
+        Some(_side) => {
+            Position { coord: new_coord, direction: current.direction }
+        },
+        None => {
+            let new_side = match original_side {
+                SideDirection::Top => {
+                    match increment {
+                        Increment { row: 0, col: -1 } => SideDirection::Left,
+                        Increment { row: 0, col: 1 } => SideDirection::Right,
+                        Increment { row: -1, col: 0 } => SideDirection::Back,
+                        Increment { row: 1, col: 0 } => SideDirection::Front,
+                        _ => panic!("unexpected")
                     }
-
-                    {
-                        let down_coord = Coord {
-                            row: coord.row + cube_side as i64,
-                            col: coord.col,
-                        };
-                        match board.get(down_coord) {
-                            None => {},
-                            Some(_) => {
-                                let new_direction = rotate(*dir, Direction::Left);
-                                if !directions.contains_key(&down_coord) {
-                                    directions.insert(down_coord, new_direction);
-                                } else {
-                                    if directions[&down_coord] != new_direction {
-                                        panic!("unexpected")
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    {
-                        let left_coord = Coord {
-                            row: coord.row,
-                            col: coord.col - cube_side as i64
-                        };
-                        match board.get(left_coord) {
-                            None => {},
-                            Some(_) => {
-                                let new_direction = rotate(*dir, Direction::Left);
-                                if !directions.contains_key(&left_coord) {
-                                    directions.insert(left_coord, new_direction);
-                                } else {
-                                    if directions[&left_coord] != new_direction {
-                                        panic!("unexpected")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    {
-                        let right_coord = Coord {
-                            row: coord.row,
-                            col: coord.col + cube_side as i64,
-                        };
-                        match board.get(right_coord) {
-                            None => {},
-                            Some(_) => {
-                                let new_direction = rotate(*dir, Direction::Left);
-                                if !directions.contains_key(&right_coord) {
-                                    directions.insert(right_coord, new_direction);
-                                } else {
-                                    if directions[&right_coord] != new_direction {
-                                        panic!("unexpected")
-                                    }
-                                }
-                            }
-                        }
-                    }
-
                 },
-                None => {
-                    // pass
-                }
+                _ => panic!("TODO")
+            };
+            let quaternion = cube.sides[&new_side].quaternion;
+            let adjusted_new_coord = transform( increment, &quaternion, len_of_side);
+
+            let new_direction = transform_direction(current.direction, &transformation);
+            let new_side_coords = cube.sides[&new_side].0;
+            Position {
+                coord: Coord {
+                    row: adjusted_new_coord.row + new_side_coords.row,
+                    col: adjusted_new_coord.col + new_side_coords.col,
+                },
+                direction: new_direction
             }
         }
     }
-
-    let directions_reverse: HashMap<SideDirection, Coord> = directions.iter().map(|(k, v)| (*v, *k)).collect();
-
-    Cube {
-        top: (directions_reverse[&SideDirection::Top], SideDirection::Top),
-        bottom: (directions_reverse[&SideDirection::Bottom], SideDirection::Bottom),
-        left: (directions_reverse[&SideDirection::Left], SideDirection::Left),
-        right: (directions_reverse[&SideDirection::Right], SideDirection::Right),
-        front: (directions_reverse[&SideDirection::Front], SideDirection::Front),
-        back: (directions_reverse[&SideDirection::Back], SideDirection::Back),
-    }
 }
-*/
-fn calc_next_col(board: &Board, current: Position, diff: i64, as_cube: bool) -> Position {
+
+fn calc_next_col(cube: &Cube, board: &Board, current: Position, diff: i64, as_cube: bool) -> Position {
     let mut new_coord = Coord {
         col: current.coord.col as i64 + diff,
         row: current.coord.row,
     };
 
     if as_cube {
-        let cube_side = max(board.num_columns(), board.num_rows()) / 4;
-        // if
-
-        panic!("");
+        get_side(&cube, &board, current, Increment { row: 0, col: diff })
     } else {
         loop {
             match board.get(new_coord) {
@@ -338,16 +299,14 @@ fn calc_next_col(board: &Board, current: Position, diff: i64, as_cube: bool) -> 
     }
 }
 
-fn calc_next_row(board: &Board, current: Position, diff: i64, as_cube: bool) -> Position {
+fn calc_next_row(cube: &Cube, board: &Board, current: Position, diff: i64, as_cube: bool) -> Position {
     let mut new_coord = Coord {
         col: current.coord.col,
         row: current.coord.row as i64 + diff,
     };
 
     if as_cube {
-        let cube_side = max(board.num_columns(), board.num_rows()) / 4;
-
-        panic!("");
+        get_side(cube, board, current, Increment { col: 0, row: diff })
     } else {
         loop {
             match board.get(new_coord) {
@@ -369,19 +328,19 @@ fn calc_next_row(board: &Board, current: Position, diff: i64, as_cube: bool) -> 
     }
 }
 
-fn calc_next(board: &Board, current: Position, as_cube: bool) -> Option<Position> {
+fn calc_next(cube: &Cube, board: &Board, current: Position, as_cube: bool) -> Option<Position> {
     let next = match current.direction {
         Direction::Left => {
-            calc_next_col(board, current, -1, as_cube)
+            calc_next_col(cube, board, current, -1, as_cube)
         },
         Direction::Up => {
-            calc_next_row(board, current, -1, as_cube)
+            calc_next_row(cube, board, current, -1, as_cube)
         },
         Direction::Right => {
-            calc_next_col(board, current, 1, as_cube)
+            calc_next_col(cube, board, current, 1, as_cube)
         },
         Direction::Down => {
-            calc_next_row(board, current, 1, as_cube)
+            calc_next_row(cube, board, current, 1, as_cube)
         }
     };
 
@@ -398,13 +357,13 @@ fn calc_next(board: &Board, current: Position, as_cube: bool) -> Option<Position
     }
 }
 
-fn follow_path(board: &Board, path: &Path, start: Position, as_cube: bool) -> Position {
+fn follow_path(cube: &Cube, board: &Board, path: &Path, start: Position, as_cube: bool) -> Position {
     let mut current = start;
     for _move in path.iter() {
         match _move {
             Move::Forward(steps) => {
                 for _ in 0..*steps {
-                    match calc_next(board, current, as_cube) {
+                    match calc_next(&cube, board, current, as_cube) {
                         None => {
                             break;
                         },
@@ -467,9 +426,10 @@ fn calc_start_position(board: &Board) -> Position {
 
 pub fn part1(file_path: &str) -> i64 {
     let (board, path) = parse(file_path);
+    let cube = calc_cube(&board);
 
 
-    let ending = follow_path(&board, &path, calc_start_position(&board), false);
+    let ending = follow_path(&cube, &board, &path, calc_start_position(&board), false);
     let ret = (1000 * (ending.coord.row + 1)) + (4 * (ending.coord.col + 1)) + match ending.direction {
         Direction::Right => 0,
         Direction::Down => 1,
@@ -482,8 +442,9 @@ pub fn part1(file_path: &str) -> i64 {
 
 pub fn part2(file_path: &str) -> i64 {
     let (board, path) = parse(file_path);
+    let cube = calc_cube(&board);
 
-    let ending = follow_path(&board, &path, calc_start_position(&board), true);
+    let ending = follow_path(&cube, &board, &path, calc_start_position(&board), true);
     let ret = (1000 * (ending.coord.row + 1)) + (4 * (ending.coord.col + 1)) + match ending.direction {
         Direction::Right => 0,
         Direction::Down => 1,
@@ -493,4 +454,12 @@ pub fn part2(file_path: &str) -> i64 {
 
     ret as i64
 
+}
+*/
+pub fn part1(file_path: &str) -> i64 {
+    0
+}
+
+pub fn part2(file_path: &str) -> i64 {
+    0
 }

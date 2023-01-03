@@ -11,3 +11,4 @@ regex = '*'
 lazy_static = '*'
 serde = '*'
 serde_json = "*"
+nalgebra = "*"
